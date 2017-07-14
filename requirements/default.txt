@@ -4,3 +4,4 @@ django-otp>=0.3.5
 six>=1.10.0
 twilio>=5.4.0
 pyotp>=2.2.6
+qrcode==5.3
