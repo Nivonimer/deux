@@ -1,15 +1,15 @@
 from __future__ import absolute_import, unicode_literals
 
-from binascii import unhexlify
+import pyotp
 
 from django.conf import settings
 from django.db import models
 from django.utils.crypto import constant_time_compare
 
 from deux.app_settings import mfa_settings
-from deux.constants import CHALLENGE_TYPES, DISABLED, SMS
-from deux.services import generate_key
+from deux.constants import CHALLENGE_TYPES, DISABLED, SMS, QRCODE
 from deux.validators import phone_number_validator
+from deux.services import generate_key
 
 
 class AbstractMultiFactorAuth(models.Model):
@@ -23,6 +23,7 @@ class AbstractMultiFactorAuth(models.Model):
     #: Different status options for this MFA object.
     CHALLENGE_CHOICES = (
         (SMS, "SMS"),
+        (QRCODE, "QRCODE"),
         (DISABLED, "Off"),
     )
 
@@ -48,16 +49,11 @@ class AbstractMultiFactorAuth(models.Model):
         help_text="Hex-Encoded Secret Key"
     )
 
-    #: Secret key used for SMS codes.
-    sms_secret_key = models.CharField(
-        max_length=32, default=generate_key,
+    #: Secret key used for codes.
+    secret_key = models.CharField(
+        max_length=32, default=pyotp.random_base32,
         help_text="Hex-Encoded Secret Key"
     )
-
-    @property
-    def sms_bin_key(self):
-        """Returns binary data of the SMS secret key."""
-        return unhexlify(self.sms_secret_key)
 
     @property
     def enabled(self):
@@ -84,7 +80,8 @@ class AbstractMultiFactorAuth(models.Model):
                 challenge=challenge_type)
         )
         return {
-            SMS: self.sms_bin_key
+            SMS: self.secret_key,
+            QRCODE: self.secret_key
         }.get(challenge_type, None)
 
     def enable(self, challenge_type):

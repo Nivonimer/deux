@@ -1,17 +1,24 @@
 from __future__ import absolute_import, unicode_literals
+import qrcode
 
 from rest_framework import generics
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
+from django.views.generic.base import View
+from django.http import HttpResponse, Http404
 
 from deux import strings
-from deux.app_settings import mfa_settings
-from deux.constants import SMS
+from deux.app_settings import mfa_settings, import_from_string
+from deux.constants import SMS, QRCODE
 from deux.serializers import (
     BackupCodeSerializer,
     MultiFactorAuthSerializer,
+    # SMS
     SMSChallengeRequestSerializer,
     SMSChallengeVerifySerializer,
+    # QRCODE
+    QRCODEChallengeRequestSerializer,
+    QRCODEChallengeVerifySerializer
 )
 
 
@@ -92,6 +99,26 @@ class SMSChallengeVerifyDetail(_BaseChallengeView):
     serializer_class = SMSChallengeVerifySerializer
 
 
+class QRCODEChallengeRequestDetail(_BaseChallengeView):
+    """
+    class::QRCODEChallengeRequestDetail()
+
+    View for requesting QRCODE challenges to enable MFA through QR Code.
+    """
+    challenge_type = QRCODE
+    serializer_class = QRCODEChallengeRequestSerializer
+
+
+class QRCODEChallengeVerifyDetail(_BaseChallengeView):
+    """
+    class::QRCODEChallengeVerifyDetail()
+
+    View for verify QRCODE challenges to enable MFA through QR Code.
+    """
+    challenge_type = QRCODE
+    serializer_class = QRCODEChallengeVerifySerializer
+
+
 class BackupCodeDetail(MultiFactorAuthMixin, generics.RetrieveAPIView):
     """
     class::BackupCodeDetail()
@@ -100,3 +127,34 @@ class BackupCodeDetail(MultiFactorAuthMixin, generics.RetrieveAPIView):
     """
     permission_classes = (IsAuthenticated,)
     serializer_class = BackupCodeSerializer
+
+
+class QRCODEGeneratorView(View):
+    """
+    View returns an SVG image with the OTP token information
+    """
+    http_method_names = ['get']
+    default_qr_factory = 'qrcode.image.svg.SvgPathImage'
+
+    # The qrcode library only supports PNG and SVG for now
+    image_content_types = {
+        'PNG': 'image/png',
+        'SVG': 'image/svg+xml; charset=utf-8',
+    }
+
+    def get(self, request, *args, **kwargs):
+
+        # Get data for qrcode
+        image_factory_string = getattr(mfa_settings, 'TWO_FACTOR_QR_FACTORY', self.default_qr_factory)
+        image_factory = import_from_string(image_factory_string, 'TWO_FACTOR_QR_FACTORY')
+        content_type = self.image_content_types[image_factory.kind]
+
+        if 'url' not in request.GET:
+            raise Http404()
+
+        otpauth_url = request.GET['url']
+        # Make and return QR code
+        img = qrcode.make(otpauth_url, image_factory=image_factory)
+        resp = HttpResponse(content_type=content_type)
+        img.save(resp)
+        return resp

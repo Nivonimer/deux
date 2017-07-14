@@ -6,9 +6,14 @@ from rest_framework import serializers
 
 from deux.app_settings import mfa_settings
 from deux import strings
-from deux.constants import SMS
+from deux.constants import SMS, QRCODE
 from deux.exceptions import FailedChallengeError
-from deux.services import MultiFactorChallenge, verify_mfa_code
+from deux.services import MultiFactorChallenge, verify_mfa_code, generate_qrcode_url
+
+try:
+    from django.urls import reverse
+except ImportError:
+    from django.core.urlresolvers import reverse  # < django 1.10
 
 
 class MultiFactorAuthSerializer(serializers.ModelSerializer):
@@ -140,7 +145,7 @@ class _BaseChallengeVerifySerializer(MultiFactorAuthSerializer):
 
         mfa_code = internal_data.get("mfa_code")
         bin_key = self.instance.get_bin_key(self.challenge_type)
-        if not verify_mfa_code(bin_key, mfa_code):
+        if not verify_mfa_code(bin_key, mfa_code, self.challenge_type):
             raise serializers.ValidationError({
                 "mfa_code": strings.INVALID_MFA_CODE_ERROR
             })
@@ -205,6 +210,45 @@ class SMSChallengeVerifySerializer(_BaseChallengeVerifySerializer):
 
     #: This serializer represents the ``SMS`` challenge type.
     challenge_type = SMS
+
+
+class QRCODEChallengeRequestSerializer(_BaseChallengeRequestSerializer):
+    """
+    class::QRCODEChallengeRequestSerializer()
+
+    Serializer that facilitates a request to enable MFA over QR CODE.
+    """
+
+    #: This serializer represents the ``QRCODE`` challenge type.
+    challenge_type = QRCODE
+
+    class Meta(_BaseChallengeRequestSerializer.Meta):
+        fields = ()
+
+    def update(self, mfa_instance, validated_data):
+        super(QRCODEChallengeRequestSerializer, self).update(mfa_instance, validated_data)
+
+        return mfa_instance
+
+    def to_representation(self, mfa_instance):
+        data = super(QRCODEChallengeRequestSerializer, self).to_representation(mfa_instance)
+
+        otpauth_url = generate_qrcode_url(self.instance.get_bin_key(self.challenge_type), self.instance.user.username)
+        data['qrcode_url'] = reverse('mfa:qrcode_generate-detail') + '?url=' + otpauth_url
+
+        return data
+
+
+class QRCODEChallengeVerifySerializer(_BaseChallengeVerifySerializer):
+    """
+    class::QRCODEChallengeVerifySerializer()
+
+    Extension of ``_BaseChallengeVerifySerializer`` that implements
+    challenge verification for the QRCODE challenge.
+    """
+
+    #: This serializer represents the ``QRCODE`` challenge type.
+    challenge_type = QRCODE
 
 
 class BackupCodeSerializer(serializers.ModelSerializer):

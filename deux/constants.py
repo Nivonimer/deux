@@ -6,5 +6,8 @@ DISABLED = ""
 #: Represents the state of using ``SMS`` for MFA.
 SMS = "sms"
 
+#: Represents the state of using ``QRCODE`` for MFA.
+QRCODE = "qrcode"
+
 #: A tuple of all support challenge types.
-CHALLENGE_TYPES = (SMS,)
+CHALLENGE_TYPES = (SMS, QRCODE)
