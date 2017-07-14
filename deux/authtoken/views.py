@@ -33,10 +33,14 @@ class ObtainMFAAuthToken(ObtainAuthToken):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         if "mfa_required" in data and data["mfa_required"]:
-            return Response({
+            response = {
                 "mfa_required": True,
                 "mfa_type": serializer.validated_data["mfa_type"]
-            })
+            }
+            if 'qrcode_url' in serializer.validated_data:
+                response.update({"qrcode_url": serializer.validated_data["qrcode_url"]})
+
+            return Response(response)
         else:
             user = serializer.validated_data['user']
             token, created = Token.objects.get_or_create(user=user)

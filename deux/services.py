@@ -1,13 +1,46 @@
 from __future__ import absolute_import, unicode_literals
 
-import six
+import pyotp
+import datetime
 from uuid import uuid4
+import qrcode
 
-from django.utils.crypto import constant_time_compare
-from django_otp.oath import totp
 
 from deux.app_settings import mfa_settings
-from deux.constants import CHALLENGE_TYPES, SMS
+from deux.constants import CHALLENGE_TYPES, SMS, QRCODE
+
+
+class TotpAuth(object):
+    def __init__(self, secret=None):
+        if secret is None:
+            secret = pyotp.random_base32()
+        self.secret = secret
+        self.totp = pyotp.TOTP(secret)
+
+    def generate_token(self):
+        return self.totp.now()
+
+    def valid(self, token):
+        token = int(token)
+        now = datetime.datetime.now()
+        time30secsago = now + datetime.timedelta(seconds=-30)
+        try:
+            valid_now = self.totp.verify(token)
+            valid_past = self.totp.verify(token, for_time=time30secsago)
+            return valid_now or valid_past
+        except Exception:
+            return False
+
+    def qrcode(self, username):
+        uri = self.totp.provisioning_uri(username)
+        return qrcode.make(uri)
+
+    def qrcode_uri(self, username):
+        return self.totp.provisioning_uri(username)
+
+
+def generate_qrcode_url(bin_key, username):
+    return TotpAuth(bin_key).qrcode_uri(username)
 
 
 def generate_mfa_code(bin_key, drift=0):
@@ -18,12 +51,7 @@ def generate_mfa_code(bin_key, drift=0):
     :param bin_key: The secret key to be converted into an MFA code
     :param drift: Number of time steps to shift the conversion.
     """
-    return six.text_type(totp(
-        bin_key,
-        step=mfa_settings.STEP_SIZE,
-        digits=mfa_settings.MFA_CODE_NUM_DIGITS,
-        drift=drift
-    )).zfill(mfa_settings.MFA_CODE_NUM_DIGITS)
+    return TotpAuth(bin_key).generate_token()
 
 
 def generate_key():
@@ -31,7 +59,7 @@ def generate_key():
     return uuid4().hex
 
 
-def verify_mfa_code(bin_key, mfa_code):
+def verify_mfa_code(bin_key, mfa_code, challenge_type=SMS):
     """
     Verifies that the inputted ``mfa_code`` is a valid code for the given
     secret key. We check the ``mfa_code`` against the current time stamp as
@@ -47,12 +75,7 @@ def verify_mfa_code(bin_key, mfa_code):
     except ValueError:
         return False
     else:
-        totp_check = lambda drift: int(
-            generate_mfa_code(bin_key=bin_key, drift=drift))
-        return any(
-            constant_time_compare(totp_check(drift), mfa_code)
-            for drift in [-1, 0, 1]
-        )
+        return TotpAuth(bin_key).valid(mfa_code)
 
 
 class MultiFactorChallenge(object):
@@ -79,7 +102,8 @@ class MultiFactorChallenge(object):
         type of this object.
         """
         dispatch = {
-            SMS: self._sms_challenge
+            SMS: self._sms_challenge,
+            QRCODE: self._qrcode_challenge
         }
         for challenge in CHALLENGE_TYPES:
             assert challenge in dispatch, (
@@ -93,3 +117,7 @@ class MultiFactorChallenge(object):
         code = generate_mfa_code(bin_key=self.instance.sms_bin_key)
         mfa_settings.SEND_MFA_TEXT_FUNC(
             mfa_instance=self.instance, mfa_code=code)
+
+    def _qrcode_challenge(self):
+        """Executes your QRCODE challenge method."""
+        return

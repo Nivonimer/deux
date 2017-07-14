@@ -5,7 +5,13 @@ from rest_framework import serializers
 from rest_framework.authtoken.serializers import AuthTokenSerializer
 
 from deux import strings
-from deux.services import MultiFactorChallenge, verify_mfa_code
+from deux.services import MultiFactorChallenge, verify_mfa_code, generate_qrcode_url
+from deux.constants import QRCODE
+
+try:
+    from django.urls import reverse
+except ImportError:
+    from django.core.urlresolvers import reverse  # < django 1.10
 
 
 class MFAAuthTokenSerializer(AuthTokenSerializer):
@@ -58,7 +64,7 @@ class MFAAuthTokenSerializer(AuthTokenSerializer):
                     force_text(strings.BOTH_CODES_ERROR))
             elif mfa_code:
                 bin_key = mfa.get_bin_key(mfa.challenge_type)
-                if not verify_mfa_code(bin_key, mfa_code):
+                if not verify_mfa_code(bin_key, mfa_code, mfa.challenge_type):
                     raise serializers.ValidationError(
                         force_text(strings.INVALID_MFA_CODE_ERROR))
             elif backup_code:
@@ -70,4 +76,8 @@ class MFAAuthTokenSerializer(AuthTokenSerializer):
                 challenge.generate_challenge()
                 attrs["mfa_required"] = True
                 attrs["mfa_type"] = mfa.challenge_type
+                if mfa.challenge_type == QRCODE:
+                    otpauth_url = generate_qrcode_url(mfa.get_bin_key(mfa.challenge_type), mfa.user.username)
+                    attrs["qrcode_url"] = reverse('mfa:qrcode_generate-detail') + '?url=' + otpauth_url
+
         return attrs
