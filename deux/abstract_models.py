@@ -117,6 +117,15 @@ class AbstractMultiFactorAuth(models.Model):
         self.phone_number = ""
         self.save()
 
+    def revoke(self):
+        """
+        Revoke secret MFA for this user.
+
+        This method generate a new secret_key for this user.
+        """
+        self.secret_key = pyotp.random_base32()
+        self.save()
+
     def refresh_backup_code(self):
         """
         Refreshes the users backup key and returns a new backup code.
