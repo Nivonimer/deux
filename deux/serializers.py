@@ -39,7 +39,7 @@ class MultiFactorAuthSerializer(serializers.ModelSerializer):
         if mfa_instance.enabled:
             data["challenge_type"] = mfa_instance.challenge_type
         if mfa_instance.phone_number:
-            data["phone_number"] = mfa_instance.phone_number
+            data["phone_number"] = mfa_instance.get_phone_number()
         return data
 
     class Meta:
