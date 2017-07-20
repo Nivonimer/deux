@@ -61,7 +61,7 @@ class _BaseChallengeRequestSerializer(MultiFactorAuthSerializer):
         :raises NotImplemented: If the extending class does not define
             ``challenge_type``.
         """
-        raise NotImplemented  # pragma: no cover
+        raise NotImplementedError  # pragma: no cover
 
     def execute_challenge(self, instance):
         """
@@ -126,7 +126,7 @@ class _BaseChallengeVerifySerializer(MultiFactorAuthSerializer):
         :raises NotImplemented: If the extending class does not define
             ``challenge_type``.
         """
-        raise NotImplemented  # pragma: no cover
+        raise NotImplementedError  # pragma: no cover
 
     def validate(self, internal_data):
         """
@@ -145,7 +145,7 @@ class _BaseChallengeVerifySerializer(MultiFactorAuthSerializer):
 
         mfa_code = internal_data.get("mfa_code")
         bin_key = self.instance.get_bin_key(self.challenge_type)
-        if not verify_mfa_code(bin_key, mfa_code, self.challenge_type):
+        if not verify_mfa_code(bin_key, mfa_code):
             raise serializers.ValidationError({
                 "mfa_code": strings.INVALID_MFA_CODE_ERROR
             })
@@ -233,7 +233,11 @@ class QRCODEChallengeRequestSerializer(_BaseChallengeRequestSerializer):
     def to_representation(self, mfa_instance):
         data = super(QRCODEChallengeRequestSerializer, self).to_representation(mfa_instance)
 
-        otpauth_url = generate_qrcode_url(self.instance.get_bin_key(self.challenge_type), self.instance.user.username)
+        otpauth_url = generate_qrcode_url(
+            self.instance.get_bin_key(self.challenge_type),
+            self.instance.user.username,
+            mfa_settings.APP_NAME
+        )
         data['qrcode_url'] = reverse('mfa:qrcode_generate-detail') + '?url=' + otpauth_url
 
         return data

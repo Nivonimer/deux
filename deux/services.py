@@ -35,15 +35,15 @@ class TotpAuth(object):
         uri = self.totp.provisioning_uri(username)
         return qrcode.make(uri)
 
-    def qrcode_uri(self, username):
-        return self.totp.provisioning_uri(username)
+    def qrcode_uri(self, username, issuer_name):
+        return self.totp.provisioning_uri(username, issuer_name=issuer_name)
 
 
-def generate_qrcode_url(bin_key, username):
-    return TotpAuth(bin_key).qrcode_uri(username)
+def generate_qrcode_url(bin_key, username, issuer_name):
+    return TotpAuth(bin_key).qrcode_uri(username, issuer_name)
 
 
-def generate_mfa_code(bin_key, drift=0):
+def generate_mfa_code(bin_key):
     """
     Generates an MFA code based on the ``bin_key`` for the current timestamp
     offset by the ``drift``.
@@ -59,7 +59,7 @@ def generate_key():
     return uuid4().hex
 
 
-def verify_mfa_code(bin_key, mfa_code, challenge_type=SMS):
+def verify_mfa_code(bin_key, mfa_code):
     """
     Verifies that the inputted ``mfa_code`` is a valid code for the given
     secret key. We check the ``mfa_code`` against the current time stamp as
@@ -71,7 +71,7 @@ def verify_mfa_code(bin_key, mfa_code, challenge_type=SMS):
     if not mfa_code:
         return False
     try:
-        mfa_code = int(mfa_code)
+        mfa_code = mfa_code
     except ValueError:
         return False
     else:
@@ -114,7 +114,7 @@ class MultiFactorChallenge(object):
 
     def _sms_challenge(self):
         """Executes the SMS challenge."""
-        code = generate_mfa_code(bin_key=self.instance.sms_bin_key)
+        code = generate_mfa_code(bin_key=self.instance.get_bin_key(SMS))
         mfa_settings.SEND_MFA_TEXT_FUNC(
             mfa_instance=self.instance, mfa_code=code)
 

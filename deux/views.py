@@ -53,6 +53,9 @@ class MultiFactorAuthDetail(
         :raises rest_framework.exceptions.ValidationError: If MFA is not
             enabled.
         """
+        if 'revoke' in self.request.GET:
+            instance.revoke()
+
         if not instance.enabled:
             raise ValidationError({
                 "detail": strings.DISABLED_ERROR

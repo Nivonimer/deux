@@ -17,6 +17,7 @@ DEFAULTS = {
     "TWILIO_ACCOUNT_SID": "",
     "TWILIO_AUTH_TOKEN": "",
     "TWILIO_SMS_POOL_SID": "",
+    "APP_NAME": "Application Name",
 }
 
 # List of settings that cannot be empty.
