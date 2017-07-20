@@ -65,6 +65,13 @@ class AbstractMultiFactorAuth(models.Model):
         """Returns the users backup code."""
         return self.backup_key.upper()[:mfa_settings.BACKUP_CODE_DIGITS]
 
+    def get_phone_number(self):
+        """Returns the users masked phone number."""
+        if mfa_settings.MASKED_PHONE_NUMBER:
+            return self.phone_number[:2] + '* *** *' + self.phone_number[-2:]
+
+        return self.phone_number
+
     def get_bin_key(self, challenge_type):
         """
         Returns the key associated with the inputted challenge type.
