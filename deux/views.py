@@ -10,6 +10,7 @@ from django.http import HttpResponse, Http404
 from deux import strings
 from deux.app_settings import mfa_settings, import_from_string
 from deux.constants import SMS, QRCODE
+from deux.models import BackupPhoneAuth
 from deux.serializers import (
     BackupCodeSerializer,
     MultiFactorAuthSerializer,
@@ -18,7 +19,10 @@ from deux.serializers import (
     SMSChallengeVerifySerializer,
     # QRCODE
     QRCODEChallengeRequestSerializer,
-    QRCODEChallengeVerifySerializer
+    QRCODEChallengeVerifySerializer,
+    # Backup Phone
+    BackupPhoneRequestSerializer,
+    BackupPhoneVerifySerializer
 )
 
 
@@ -161,3 +165,36 @@ class QRCODEGeneratorView(View):
         resp = HttpResponse(content_type=content_type)
         img.save(resp)
         return resp
+
+
+class BackupPhoneChallengeMixin(object):
+    """
+    class::BackupPhoneChallengeMixin()
+
+    Mixin that defines queries for MFA objects.
+    """
+    permission_classes = (IsAuthenticated,)
+
+    def get_object(self):
+        """Gets the current user's MFA instance"""
+        instance, created = BackupPhoneAuth.objects.get_or_create(
+            user=self.request.user)
+
+        return instance
+
+class BackupPhoneRequestDetail(BackupPhoneChallengeMixin, generics.UpdateAPIView):
+    """
+    class::BackupPhoneRequestDetail()
+
+    View for retrieving the user's backup code.
+    """
+    serializer_class = BackupPhoneRequestSerializer
+
+
+class BackupPhoneVerifyDetail(BackupPhoneChallengeMixin, generics.UpdateAPIView):
+    """
+    class::BackupPhoneVerifyDetail()
+
+    View for retrieving the user's backup code.
+    """
+    serializer_class = BackupPhoneVerifySerializer

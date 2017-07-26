@@ -1,15 +1,93 @@
 from __future__ import absolute_import, unicode_literals
 
 import pyotp
+import uuid
 
 from django.conf import settings
 from django.db import models
 from django.utils.crypto import constant_time_compare
+from django.utils.translation import ugettext_lazy as _
 
 from deux.app_settings import mfa_settings
 from deux.constants import CHALLENGE_TYPES, DISABLED, SMS, QRCODE
 from deux.validators import phone_number_validator
 from deux.services import generate_key
+
+
+class BackupPhoneManager(models.Manager):
+    """
+    The :class:`~django.db.models.Manager` object installed as
+    ``Device.objects``.
+    """
+    def backup_phones_for_user(self, user, confirmed=None):
+        """
+        Returns a queryset for all devices of this class that belong to the
+        given user.
+        :param user: The user.
+        :type user: :class:`~django.contrib.auth.models.User`
+        :param confirmed: If ``None``, all matching devices are returned.
+            Otherwise, this can be any true or false value to limit the query
+            to confirmed or unconfirmed devices, respectively.
+        """
+        backup_phones = self.model.objects.filter(user=user)
+        if confirmed is not None:
+            backup_phones = backup_phones.filter(confirmed=bool(confirmed))
+
+        return backup_phones
+
+    def get_or_create(self, user, *args, **kwargs):
+        backup_phones = self.backup_phones_for_user(user, False)
+        if backup_phones.count() > 0:
+            return backup_phones[0], False
+        
+        return super(BackupPhoneManager, self).get_or_create(user=user, *args, **kwargs)
+
+
+class AbstractBackupPhone(models.Model):
+    """
+    Model with phone number and token seed linked to a user.
+    """
+    PHONE_METHODS = (
+        ('call', _('Phone Call')),
+        ('sms', _('Text Message')),
+    )
+
+    id = models.UUIDField(
+        primary_key=True, default=uuid.uuid4, editable=False
+    )
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL
+    )
+
+    phone_number = models.CharField(
+        max_length=15, blank=False, null=False, validators=[phone_number_validator]
+    )
+
+    secret_key = models.CharField(
+        max_length=32, default=pyotp.random_base32,
+        help_text="Hex-Encoded Secret Key"
+    )
+
+    method = models.CharField(
+        max_length=4,
+        default='sms',
+        choices=PHONE_METHODS,
+        verbose_name=_('method')
+    )
+
+    confirmed = models.BooleanField(
+        default=False, help_text="Is this device ready for use?"
+    )
+
+    objects = BackupPhoneManager()
+
+    @property
+    def bin_key(self):
+        return self.secret_key
+
+    class Meta:
+        abstract = True
 
 
 class AbstractMultiFactorAuth(models.Model):

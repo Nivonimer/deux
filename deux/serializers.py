@@ -8,7 +8,8 @@ from deux.app_settings import mfa_settings
 from deux import strings
 from deux.constants import SMS, QRCODE
 from deux.exceptions import FailedChallengeError
-from deux.services import MultiFactorChallenge, verify_mfa_code, generate_qrcode_url
+from deux.services import MultiFactorChallenge, verify_mfa_code, generate_qrcode_url, generate_mfa_code
+from deux.models import BackupPhoneAuth
 
 try:
     from django.urls import reverse
@@ -284,3 +285,80 @@ class BackupCodeSerializer(serializers.ModelSerializer):
     class Meta:
         model = mfa_settings.MFA_MODEL
         fields = ("backup_code",)
+
+
+class BackupPhoneSerializer(serializers.ModelSerializer):
+    """
+    class::BackupPhoneSerializer()
+
+    Basic BackupPhoneSerializer that encodes MFA objects into a standard
+    response.
+
+    The standard response returns whether MFA is enabled, the challenge
+    type, and the user's phone number.
+    """
+
+    class Meta:
+        model = BackupPhoneAuth
+
+
+class BackupPhoneRequestSerializer(BackupPhoneSerializer):
+    """
+    class::BackupPhoneRequestSerializer()
+
+    Serializer that facilitates a request to enable MFA over QR CODE.
+    """
+
+    class Meta(BackupPhoneSerializer.Meta):
+        fields = ("phone_number",)
+        extra_kwargs = {
+            "phone_number": {
+                "required": True,
+            },
+        }
+
+    def update(self, instance, validated_data):
+        """Executes the SMS challenge."""
+        super(BackupPhoneRequestSerializer, self).update(instance, validated_data)
+
+        code = generate_mfa_code(bin_key=instance.bin_key)
+        mfa_settings.SEND_MFA_TEXT_FUNC(instance.phone_number, mfa_code=code)
+
+        return instance
+
+
+class BackupPhoneVerifySerializer(BackupPhoneSerializer):
+    """
+    class::BackupPhoneVerifySerializer()
+
+    Serializer that facilitates a request to enable MFA over QR CODE.
+    """
+
+    #: Requests to verify an MFA code must include an ``mfa_code``.
+    mfa_code = serializers.CharField()
+
+    class Meta(BackupPhoneSerializer.Meta):
+        fields = ("mfa_code",)
+
+    def validate(self, internal_data):
+        if self.instance.confirmed:
+            raise serializers.ValidationError({
+                "detail": strings.ENABLED_ERROR
+            })
+
+        mfa_code = internal_data.get("mfa_code")
+        bin_key = self.instance.bin_key
+
+        if not verify_mfa_code(bin_key, mfa_code):
+            raise serializers.ValidationError({
+                "mfa_code": strings.INVALID_MFA_CODE_ERROR
+            })
+
+        print 'AQUUI'
+        return {}
+
+    def update(self, instance, validated_data):
+        instance.confirmed = True
+        instance.save()
+
+        return instance
