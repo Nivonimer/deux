@@ -238,7 +238,8 @@ class QRCODEChallengeRequestSerializer(_BaseChallengeRequestSerializer):
             self.instance.user.username,
             mfa_settings.APP_NAME
         )
-        data['qrcode_url'] = reverse('mfa:qrcode_generate-detail') + '?url=' + otpauth_url
+        request = self.context['request']
+        data['qrcode_url'] = request.build_absolute_uri(reverse('mfa:qrcode_generate-detail')) + '?url=' + otpauth_url
 
         return data
 
