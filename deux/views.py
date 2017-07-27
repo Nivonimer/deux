@@ -6,10 +6,12 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from django.views.generic.base import View
 from django.http import HttpResponse, Http404
+from django.utils.translation import ugettext_lazy as _
 
 from deux import strings
 from deux.app_settings import mfa_settings, import_from_string
 from deux.constants import SMS, QRCODE
+from deux.models import BackupPhoneAuth
 from deux.serializers import (
     BackupCodeSerializer,
     MultiFactorAuthSerializer,
@@ -18,7 +20,11 @@ from deux.serializers import (
     SMSChallengeVerifySerializer,
     # QRCODE
     QRCODEChallengeRequestSerializer,
-    QRCODEChallengeVerifySerializer
+    QRCODEChallengeVerifySerializer,
+    # Backup Phone
+    BackupPhoneCreateSerializer,
+    BackupPhoneRequestSerializer,
+    BackupPhoneVerifySerializer
 )
 
 
@@ -61,6 +67,11 @@ class MultiFactorAuthDetail(
                 "detail": strings.DISABLED_ERROR
             })
         instance.disable()
+
+        # delete all backup phones
+        BackupPhoneAuth.objects.backup_phones_for_user(
+            user=self.request.user
+        ).delete()
 
 
 class _BaseChallengeView(MultiFactorAuthMixin, generics.UpdateAPIView):
@@ -161,3 +172,61 @@ class QRCODEGeneratorView(View):
         resp = HttpResponse(content_type=content_type)
         img.save(resp)
         return resp
+
+
+class BackupPhoneChallengeMixin(object):
+    """
+    class::BackupPhoneChallengeMixin()
+
+    Mixin that defines queries for MFA objects.
+    """
+    permission_classes = (IsAuthenticated,)
+
+    def get_object(self):
+        """Gets the current user's MFA instance"""
+        
+        backupphone_id = self.kwargs['backupphone_id']
+        results = BackupPhoneAuth.objects.backup_phones_for_user(
+            user=self.request.user
+        )
+        results = results.filter(pk=backupphone_id)
+
+        if results.count() == 0:
+            raise Http404
+
+        return results[0]
+
+
+class BackupPhoneCreate(BackupPhoneChallengeMixin, generics.CreateAPIView):
+    """
+    class::BackupPhoneRequestDetail()
+
+    View for retrieving the user's backup code.
+    """
+    serializer_class = BackupPhoneCreateSerializer
+
+
+class BackupPhoneRequestDetail(BackupPhoneChallengeMixin, generics.UpdateAPIView):
+    """
+    class::BackupPhoneVerifyDetail()
+
+    View for retrieving the user's backup code.
+    """
+    serializer_class = BackupPhoneRequestSerializer
+
+
+class BackupPhoneVerifyDetail(BackupPhoneChallengeMixin, generics.UpdateAPIView):
+    """
+    class::BackupPhoneVerifyDetail()
+
+    View for retrieving the user's backup code.
+    """
+    serializer_class = BackupPhoneVerifySerializer
+
+
+class BackupPhoneDelete(BackupPhoneChallengeMixin, generics.DestroyAPIView):
+    """
+    class::BackupPhoneDelete()  
+
+    View for retrieving the user's backup code.
+    """

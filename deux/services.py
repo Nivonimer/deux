@@ -115,8 +115,7 @@ class MultiFactorChallenge(object):
     def _sms_challenge(self):
         """Executes the SMS challenge."""
         code = generate_mfa_code(bin_key=self.instance.get_bin_key(SMS))
-        mfa_settings.SEND_MFA_TEXT_FUNC(
-            mfa_instance=self.instance, mfa_code=code)
+        mfa_settings.SEND_MFA_TEXT_FUNC(self.instance.phone_number, mfa_code=code)
 
     def _qrcode_challenge(self):
         """Executes your QRCODE challenge method."""

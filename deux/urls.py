@@ -23,6 +23,19 @@ urlpatterns = [
     url(r"^qrcode/generate/$", views.QRCODEGeneratorView.as_view(),
         name="qrcode_generate-detail"),
 
+    # BACKUP PHONE NUMBERS
+    url(r"^backupphone/$", views.BackupPhoneCreate.as_view(),
+        name="backupphone-create"),
+    url(r"^backupphone/(?P<backupphone_id>[0-9a-z-]+)/verify/$", 
+        views.BackupPhoneVerifyDetail.as_view(),
+        name="backupphone_verify-detail"),
+    url(r"^backupphone/(?P<backupphone_id>[0-9a-z-]+)/request/$", 
+        views.BackupPhoneRequestDetail.as_view(),
+        name="backupphone_request-detail"),
+    url(r"^backupphone/(?P<backupphone_id>[0-9a-z-]+)/$", 
+        views.BackupPhoneDelete.as_view(),
+        name="backupphone-delete"),
+
     url(r"^recovery/$", views.BackupCodeDetail.as_view(),
         name="backup_code-detail"),
 ]

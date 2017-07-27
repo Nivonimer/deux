@@ -11,11 +11,11 @@ from deux.exceptions import InvalidPhoneNumberError, TwilioMessageError
 NOT_SMS_DEVICE_CODE = 21401
 
 
-def send_mfa_code_text_message(mfa_instance, mfa_code):
+def send_mfa_code_text_message(phone_number, mfa_code):
     """
     Sends the MFA Code text message to the user.
 
-    :param mfa_instance: :class:`MultiFactorAuth` instance to use.
+    :param phone_number: phone_number to use.
     :param mfa_code: MFA code in the form of a string.
 
     :raises deux.exceptions.InvalidPhoneNumberError: To tell system that this
@@ -36,7 +36,7 @@ def send_mfa_code_text_message(mfa_instance, mfa_code):
     try:
         twilio_client.messages.create(
             body=strings.MFA_CODE_TEXT_MESSAGE.format(code=mfa_code),
-            to=mfa_instance.phone_number,
+            to=phone_number,
             from_=twilio_num
         )
     except TwilioRestException as e:
