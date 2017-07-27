@@ -6,6 +6,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from django.views.generic.base import View
 from django.http import HttpResponse, Http404
+from django.utils.translation import ugettext_lazy as _
 
 from deux import strings
 from deux.app_settings import mfa_settings, import_from_string
@@ -21,6 +22,7 @@ from deux.serializers import (
     QRCODEChallengeRequestSerializer,
     QRCODEChallengeVerifySerializer,
     # Backup Phone
+    BackupPhoneCreateSerializer,
     BackupPhoneRequestSerializer,
     BackupPhoneVerifySerializer
 )
@@ -65,6 +67,11 @@ class MultiFactorAuthDetail(
                 "detail": strings.DISABLED_ERROR
             })
         instance.disable()
+
+        # delete all backup phones
+        BackupPhoneAuth.objects.backup_phones_for_user(
+            user=self.request.user
+        ).delete()
 
 
 class _BaseChallengeView(MultiFactorAuthMixin, generics.UpdateAPIView):
@@ -177,14 +184,31 @@ class BackupPhoneChallengeMixin(object):
 
     def get_object(self):
         """Gets the current user's MFA instance"""
-        instance, created = BackupPhoneAuth.objects.get_or_create(
-            user=self.request.user)
+        
+        backupphone_id = self.kwargs['backupphone_id']
+        results = BackupPhoneAuth.objects.backup_phones_for_user(
+            user=self.request.user
+        )
+        results = results.filter(pk=backupphone_id)
 
-        return instance
+        if results.count() == 0:
+            raise Http404
+
+        return results[0]
+
+
+class BackupPhoneCreate(BackupPhoneChallengeMixin, generics.CreateAPIView):
+    """
+    class::BackupPhoneRequestDetail()
+
+    View for retrieving the user's backup code.
+    """
+    serializer_class = BackupPhoneCreateSerializer
+
 
 class BackupPhoneRequestDetail(BackupPhoneChallengeMixin, generics.UpdateAPIView):
     """
-    class::BackupPhoneRequestDetail()
+    class::BackupPhoneVerifyDetail()
 
     View for retrieving the user's backup code.
     """
@@ -198,3 +222,11 @@ class BackupPhoneVerifyDetail(BackupPhoneChallengeMixin, generics.UpdateAPIView)
     View for retrieving the user's backup code.
     """
     serializer_class = BackupPhoneVerifySerializer
+
+
+class BackupPhoneDelete(BackupPhoneChallengeMixin, generics.DestroyAPIView):
+    """
+    class::BackupPhoneDelete()  
+
+    View for retrieving the user's backup code.
+    """
