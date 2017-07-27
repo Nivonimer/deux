@@ -5,8 +5,10 @@ from rest_framework import serializers
 from rest_framework.authtoken.serializers import AuthTokenSerializer
 
 from deux import strings
-from deux.services import MultiFactorChallenge, verify_mfa_code, generate_qrcode_url
+from deux.services import MultiFactorChallenge, verify_mfa_code, generate_qrcode_url, generate_mfa_code
 from deux.constants import QRCODE
+from deux.models import BackupPhoneAuth
+from deux.app_settings import mfa_settings
 
 try:
     from django.urls import reverse
@@ -27,6 +29,9 @@ class MFAAuthTokenSerializer(AuthTokenSerializer):
 
     #: Serializer field for Backup code.
     backup_code = serializers.CharField(required=False)
+
+    #: Serializer field for Backup code.
+    backup_phone = serializers.CharField(required=False)
 
     def validate(self, attrs):
         """
@@ -58,11 +63,12 @@ class MFAAuthTokenSerializer(AuthTokenSerializer):
         if mfa and mfa.enabled:
             mfa_code = attrs.get("mfa_code")
             backup_code = attrs.get("backup_code")
+            backup_phone = attrs.get("backup_phone")
 
             if mfa_code and backup_code:
                 raise serializers.ValidationError(
                     force_text(strings.BOTH_CODES_ERROR))
-            elif mfa_code:
+            elif mfa_code and not backup_phone:
                 bin_key = mfa.get_bin_key(mfa.challenge_type)
                 if not verify_mfa_code(bin_key, mfa_code):
                     raise serializers.ValidationError(
@@ -71,10 +77,32 @@ class MFAAuthTokenSerializer(AuthTokenSerializer):
                 if not mfa.check_and_use_backup_code(backup_code):
                     raise serializers.ValidationError(
                         force_text(strings.INVALID_BACKUP_CODE_ERROR))
+            elif backup_phone:
+                _backup_phone = BackupPhoneAuth.objects.get(pk=backup_phone)
+                if not mfa_code:
+                    code = generate_mfa_code(bin_key=_backup_phone.bin_key)
+                    mfa_settings.SEND_MFA_TEXT_FUNC(_backup_phone.phone_number, mfa_code=code)
+                    attrs["mfa_required"] = True
+                    attrs["mfa_type"] = mfa.challenge_type
+                else:    
+                    if not verify_mfa_code(_backup_phone.bin_key, mfa_code):
+                        raise serializers.ValidationError(
+                            force_text(strings.INVALID_MFA_CODE_ERROR))
             else:
                 challenge = MultiFactorChallenge(mfa, mfa.challenge_type)
                 challenge.generate_challenge()
                 attrs["mfa_required"] = True
                 attrs["mfa_type"] = mfa.challenge_type
+
+                attrs["backup_phones"] = []
+                backup_phones = BackupPhoneAuth.objects.backup_phones_for_user(
+                    user=user,
+                    confirmed=True
+                )
+                for backup_phone in backup_phones:
+                    attrs["backup_phones"].append({
+                        'id': str(backup_phone.pk),
+                        'phone_number': backup_phone.phone_number
+                    })           
 
         return attrs

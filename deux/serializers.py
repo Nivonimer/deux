@@ -37,10 +37,22 @@ class MultiFactorAuthSerializer(serializers.ModelSerializer):
             ``phone_number`` from the MFA instance.
         """
         data = {"enabled": mfa_instance.enabled}
-        if mfa_instance.enabled:
-            data["challenge_type"] = mfa_instance.challenge_type
         if mfa_instance.phone_number:
             data["phone_number"] = mfa_instance.get_phone_number()
+        if mfa_instance.enabled:
+            data["challenge_type"] = mfa_instance.challenge_type
+            backup_phones = BackupPhoneAuth.objects.backup_phones_for_user(
+                user=self.context['request'].user
+            )
+            data['backup_phones'] = []
+            for backup_phone in backup_phones:
+                data['backup_phones'].append({
+                    'id': str(backup_phone.pk),
+                    'confirmed': backup_phone.confirmed,
+                    'method': backup_phone.method,
+                    'phone_number': backup_phone.phone_number
+                })
+
         return data
 
     class Meta:
@@ -301,10 +313,20 @@ class BackupPhoneSerializer(serializers.ModelSerializer):
     class Meta:
         model = BackupPhoneAuth
 
+    def validate(self, internal_data):
+        user = self.context['request'].user
+        mfa = getattr(user, "multi_factor_auth", None)
 
-class BackupPhoneRequestSerializer(BackupPhoneSerializer):
+        if not mfa or not mfa.enabled:
+            raise serializers.ValidationError({
+                "detail": strings.DISABLED_ERROR
+            })
+
+        return super(BackupPhoneSerializer, self).validate(internal_data)
+
+class BackupPhoneCreateSerializer(BackupPhoneSerializer):
     """
-    class::BackupPhoneRequestSerializer()
+    class::BackupPhoneCreateSerializer()
 
     Serializer that facilitates a request to enable MFA over QR CODE.
     """
@@ -316,15 +338,68 @@ class BackupPhoneRequestSerializer(BackupPhoneSerializer):
                 "required": True,
             },
         }
+    
+    def validate(self, internal_data):
+        results = BackupPhoneAuth.objects.backup_phones_for_user(
+            user=self.context['request'].user
+        )
+        results = results.filter(phone_number=internal_data.get('phone_number'))
 
-    def update(self, instance, validated_data):
+        if results.count() > 0:
+            raise serializers.ValidationError({
+                "detail": 'Duplicated Number!'
+            })
+
+        return super(BackupPhoneCreateSerializer, self).validate(internal_data)
+    
+    def create(self, validated_data):
         """Executes the SMS challenge."""
-        super(BackupPhoneRequestSerializer, self).update(instance, validated_data)
+        instance = BackupPhoneAuth.objects.create(
+            user=self.context['request'].user,
+            phone_number=validated_data.get('phone_number')
+        )
 
         code = generate_mfa_code(bin_key=instance.bin_key)
         mfa_settings.SEND_MFA_TEXT_FUNC(instance.phone_number, mfa_code=code)
 
         return instance
+
+    def to_representation(self, instance):
+        return {
+            "id": str(instance.pk),
+            "phone_number": instance.phone_number
+        }
+
+
+class BackupPhoneRequestSerializer(BackupPhoneSerializer):
+    """
+    class::BackupPhoneRequestSerializer()
+
+    Serializer that facilitates a request to enable MFA over QR CODE.
+    """
+
+    class Meta(BackupPhoneSerializer.Meta):
+        fields = ()
+
+    def validate(self, internal_data):
+        if self.instance.confirmed:
+            raise serializers.ValidationError({
+                "detail": strings.ENABLED_ERROR
+            })
+
+        return {}
+
+    def update(self, instance, validated_data):
+        code = generate_mfa_code(bin_key=instance.bin_key)
+        mfa_settings.SEND_MFA_TEXT_FUNC(instance.phone_number, mfa_code=code)
+
+        return instance
+
+    def to_representation(self, instance):
+        return {
+            "id": str(instance.pk),
+            "phone_number": instance.phone_number
+        }
 
 
 class BackupPhoneVerifySerializer(BackupPhoneSerializer):
@@ -354,7 +429,6 @@ class BackupPhoneVerifySerializer(BackupPhoneSerializer):
                 "mfa_code": strings.INVALID_MFA_CODE_ERROR
             })
 
-        print 'AQUUI'
         return {}
 
     def update(self, instance, validated_data):
@@ -362,3 +436,8 @@ class BackupPhoneVerifySerializer(BackupPhoneSerializer):
         instance.save()
 
         return instance
+
+    def to_representation(self, instance):
+        return {
+            "confirmed": instance.confirmed
+        }
