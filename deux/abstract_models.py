@@ -2,16 +2,21 @@ from __future__ import absolute_import, unicode_literals
 
 import pyotp
 import uuid
+import re
 
 from django.conf import settings
 from django.db import models
 from django.utils.crypto import constant_time_compare
 from django.utils.translation import ugettext_lazy as _
+from phonenumber_field.modelfields import PhoneNumberField
 
 from deux.app_settings import mfa_settings
 from deux.constants import CHALLENGE_TYPES, DISABLED, SMS, QRCODE
 from deux.validators import phone_number_validator
-from deux.services import generate_key
+from deux.services import generate_key, generate_mfa_code, verify_mfa_code
+from deux.gateways import send_sms, make_call
+
+phone_mask = re.compile('(?<=.{3})[0-9](?=.{2})')
 
 
 class BackupPhoneManager(models.Manager):
@@ -35,20 +40,13 @@ class BackupPhoneManager(models.Manager):
 
         return backup_phones
 
-    def get_or_create(self, user, *args, **kwargs):
-        backup_phones = self.backup_phones_for_user(user, False)
-        if backup_phones.count() > 0:
-            return backup_phones[0], False
-        
-        return super(BackupPhoneManager, self).get_or_create(user=user, *args, **kwargs)
-
 
 class AbstractBackupPhone(models.Model):
     """
     Model with phone number and token seed linked to a user.
     """
     PHONE_METHODS = (
-        ('call', _('Phone Call')),
+        ('voice', _('Phone Call')),
         ('sms', _('Text Message')),
     )
 
@@ -60,9 +58,7 @@ class AbstractBackupPhone(models.Model):
         settings.AUTH_USER_MODEL
     )
 
-    phone_number = models.CharField(
-        max_length=15, blank=False, null=False, validators=[phone_number_validator]
-    )
+    phone_number = PhoneNumberField()
 
     secret_key = models.CharField(
         max_length=32, default=pyotp.random_base32,
@@ -85,6 +81,24 @@ class AbstractBackupPhone(models.Model):
     @property
     def bin_key(self):
         return self.secret_key
+
+    def generate_challenge(self):
+        code = generate_mfa_code(bin_key=self.bin_key)
+
+        if self.method == 'sms':
+            send_sms(self.phone_number, code)
+        elif self.method == 'voice':
+            make_call(self.phone_number, code)
+
+    def verify_challenge_code(self, mfa_code):
+        return verify_mfa_code(self.bin_key, mfa_code)
+
+    def get_phone_number(self):
+        """Returns the users masked phone number."""
+        if mfa_settings.MASKED_PHONE_NUMBER:
+            return phone_mask.sub('*', self.phone_number.as_e164)
+
+        return self.phone_number.as_e164
 
     class Meta:
         abstract = True
@@ -112,9 +126,7 @@ class AbstractMultiFactorAuth(models.Model):
     )
 
     #: User's phone number.
-    phone_number = models.CharField(
-        max_length=15, default="", blank=True,
-        validators=[phone_number_validator])
+    phone_number = PhoneNumberField(default="", blank=True)
 
     #: Challenge type used for MFA.
     challenge_type = models.CharField(
@@ -147,9 +159,9 @@ class AbstractMultiFactorAuth(models.Model):
     def get_phone_number(self):
         """Returns the users masked phone number."""
         if mfa_settings.MASKED_PHONE_NUMBER:
-            return self.phone_number[:2] + '* *** *' + self.phone_number[-2:]
+            return phone_mask.sub('*', self.phone_number.as_e164)
 
-        return self.phone_number
+        return self.phone_number.as_e164
 
     def get_bin_key(self, challenge_type):
         """
@@ -237,6 +249,34 @@ class AbstractMultiFactorAuth(models.Model):
             self.disable()
             return True
         return False
+
+    def generate_challenge(self, challenge_type):
+        """
+        Generates and executes the challenge object based on the challenge
+        type of this object.
+        """
+        dispatch = {
+            SMS: self._sms_challenge,
+            QRCODE: self._qrcode_challenge
+        }
+        for challenge in CHALLENGE_TYPES:
+            assert challenge in dispatch, (
+                "'{challenge}' does not have a challenge dispatch "
+                "method.".format(challenge=challenge)
+            )
+        return dispatch[challenge_type]()
+
+    def verify_challenge_code(self, mfa_code):
+        return verify_mfa_code(self.secret_key, mfa_code)
+
+    def _sms_challenge(self):
+        """Executes the SMS challenge."""
+        code = generate_mfa_code(bin_key=self.secret_key)
+        send_sms(self.phone_number, code)
+
+    def _qrcode_challenge(self):
+        """Executes your QRCODE challenge method."""
+        return
 
     class Meta:
         abstract = True

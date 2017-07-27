@@ -8,7 +8,7 @@ from deux.app_settings import mfa_settings
 from deux import strings
 from deux.constants import SMS, QRCODE
 from deux.exceptions import FailedChallengeError
-from deux.services import MultiFactorChallenge, verify_mfa_code, generate_qrcode_url, generate_mfa_code
+from deux.services import generate_qrcode_url
 from deux.models import BackupPhoneAuth
 
 try:
@@ -50,7 +50,7 @@ class MultiFactorAuthSerializer(serializers.ModelSerializer):
                     'id': str(backup_phone.pk),
                     'confirmed': backup_phone.confirmed,
                     'method': backup_phone.method,
-                    'phone_number': backup_phone.phone_number
+                    'phone_number': backup_phone.get_phone_number()
                 })
 
         return data
@@ -84,8 +84,7 @@ class _BaseChallengeRequestSerializer(MultiFactorAuthSerializer):
         :raises serializers.ValidationError: If the challenge fails to execute.
         """
         try:
-            MultiFactorChallenge(
-                instance, self.challenge_type).generate_challenge()
+            instance.generate_challenge(self.challenge_type)
         except FailedChallengeError as e:
             raise serializers.ValidationError({
                 "detail": six.text_type(e)
@@ -157,8 +156,7 @@ class _BaseChallengeVerifySerializer(MultiFactorAuthSerializer):
             })
 
         mfa_code = internal_data.get("mfa_code")
-        bin_key = self.instance.get_bin_key(self.challenge_type)
-        if not verify_mfa_code(bin_key, mfa_code):
+        if not self.instance.verify_challenge_code(mfa_code):
             raise serializers.ValidationError({
                 "mfa_code": strings.INVALID_MFA_CODE_ERROR
             })
@@ -240,9 +238,9 @@ class QRCODEChallengeRequestSerializer(_BaseChallengeRequestSerializer):
 
     def update(self, mfa_instance, validated_data):
         super(QRCODEChallengeRequestSerializer, self).update(mfa_instance, validated_data)
-
+        
         return mfa_instance
-
+    
     def to_representation(self, mfa_instance):
         data = super(QRCODEChallengeRequestSerializer, self).to_representation(mfa_instance)
 
@@ -252,7 +250,8 @@ class QRCODEChallengeRequestSerializer(_BaseChallengeRequestSerializer):
             mfa_settings.APP_NAME
         )
         request = self.context['request']
-        data['qrcode_url'] = request.build_absolute_uri(reverse('mfa:qrcode_generate-detail')) + '?url=' + otpauth_url
+        data['qrcode_url'] = request.build_absolute_uri(
+            reverse('mfa:qrcode_generate-detail')) + '?url=' + otpauth_url
 
         return data
 
@@ -324,6 +323,7 @@ class BackupPhoneSerializer(serializers.ModelSerializer):
 
         return super(BackupPhoneSerializer, self).validate(internal_data)
 
+
 class BackupPhoneCreateSerializer(BackupPhoneSerializer):
     """
     class::BackupPhoneCreateSerializer()
@@ -332,7 +332,7 @@ class BackupPhoneCreateSerializer(BackupPhoneSerializer):
     """
 
     class Meta(BackupPhoneSerializer.Meta):
-        fields = ("phone_number",)
+        fields = ("phone_number", "method", )
         extra_kwargs = {
             "phone_number": {
                 "required": True,
@@ -340,14 +340,20 @@ class BackupPhoneCreateSerializer(BackupPhoneSerializer):
         }
     
     def validate(self, internal_data):
-        results = BackupPhoneAuth.objects.backup_phones_for_user(
+        user_phones = BackupPhoneAuth.objects.backup_phones_for_user(
             user=self.context['request'].user
         )
-        results = results.filter(phone_number=internal_data.get('phone_number'))
+        phone_exists = user_phones.filter(phone_number=internal_data.get('phone_number'))
 
-        if results.count() > 0:
+        if phone_exists.count() > 0:
             raise serializers.ValidationError({
-                "detail": 'Duplicated Number!'
+                "detail": "Phone number already exists."
+            })
+
+        if user_phones.count() >= mfa_settings.MAX_BACKUP_PHONE_NUMBERS:
+            raise serializers.ValidationError({
+                "detail": "Limit of phone numbers is {}".format(
+                    mfa_settings.MAX_BACKUP_PHONE_NUMBERS)
             })
 
         return super(BackupPhoneCreateSerializer, self).validate(internal_data)
@@ -356,18 +362,17 @@ class BackupPhoneCreateSerializer(BackupPhoneSerializer):
         """Executes the SMS challenge."""
         instance = BackupPhoneAuth.objects.create(
             user=self.context['request'].user,
-            phone_number=validated_data.get('phone_number')
+            **validated_data
         )
-
-        code = generate_mfa_code(bin_key=instance.bin_key)
-        mfa_settings.SEND_MFA_TEXT_FUNC(instance.phone_number, mfa_code=code)
+        instance.generate_challenge()
 
         return instance
 
     def to_representation(self, instance):
         return {
             "id": str(instance.pk),
-            "phone_number": instance.phone_number
+            "phone_number": instance.get_phone_number(),
+            "method": instance.method
         }
 
 
@@ -390,15 +395,14 @@ class BackupPhoneRequestSerializer(BackupPhoneSerializer):
         return {}
 
     def update(self, instance, validated_data):
-        code = generate_mfa_code(bin_key=instance.bin_key)
-        mfa_settings.SEND_MFA_TEXT_FUNC(instance.phone_number, mfa_code=code)
+        instance.generate_challenge()
 
         return instance
 
     def to_representation(self, instance):
         return {
             "id": str(instance.pk),
-            "phone_number": instance.phone_number
+            "phone_number": instance.get_phone_number()
         }
 
 
@@ -418,13 +422,11 @@ class BackupPhoneVerifySerializer(BackupPhoneSerializer):
     def validate(self, internal_data):
         if self.instance.confirmed:
             raise serializers.ValidationError({
-                "detail": strings.ENABLED_ERROR
+                "detail": "Backup Phone is already enabled."
             })
 
         mfa_code = internal_data.get("mfa_code")
-        bin_key = self.instance.bin_key
-
-        if not verify_mfa_code(bin_key, mfa_code):
+        if not self.instance.verify_challenge_code(mfa_code):
             raise serializers.ValidationError({
                 "mfa_code": strings.INVALID_MFA_CODE_ERROR
             })
