@@ -5,9 +5,9 @@ import datetime
 from uuid import uuid4
 import qrcode
 
-
 from deux.app_settings import mfa_settings
 from deux.constants import CHALLENGE_TYPES, SMS, QRCODE
+from deux.gateways import send_sms
 
 
 class TotpAuth(object):
@@ -115,7 +115,7 @@ class MultiFactorChallenge(object):
     def _sms_challenge(self):
         """Executes the SMS challenge."""
         code = generate_mfa_code(bin_key=self.instance.get_bin_key(SMS))
-        mfa_settings.SEND_MFA_TEXT_FUNC(self.instance.phone_number, mfa_code=code)
+        send_sms(self.instance.phone_number, code)
 
     def _qrcode_challenge(self):
         """Executes your QRCODE challenge method."""

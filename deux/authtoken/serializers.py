@@ -5,7 +5,7 @@ from rest_framework import serializers
 from rest_framework.authtoken.serializers import AuthTokenSerializer
 
 from deux import strings
-from deux.services import MultiFactorChallenge, verify_mfa_code, generate_qrcode_url, generate_mfa_code
+from deux.services import generate_qrcode_url
 from deux.constants import QRCODE
 from deux.models import BackupPhoneAuth
 from deux.app_settings import mfa_settings
@@ -69,8 +69,7 @@ class MFAAuthTokenSerializer(AuthTokenSerializer):
                 raise serializers.ValidationError(
                     force_text(strings.BOTH_CODES_ERROR))
             elif mfa_code and not backup_phone:
-                bin_key = mfa.get_bin_key(mfa.challenge_type)
-                if not verify_mfa_code(bin_key, mfa_code):
+                if not mfa.verify_challenge_code(mfa_code):
                     raise serializers.ValidationError(
                         force_text(strings.INVALID_MFA_CODE_ERROR))
             elif backup_code:
@@ -80,17 +79,15 @@ class MFAAuthTokenSerializer(AuthTokenSerializer):
             elif backup_phone:
                 _backup_phone = BackupPhoneAuth.objects.get(pk=backup_phone)
                 if not mfa_code:
-                    code = generate_mfa_code(bin_key=_backup_phone.bin_key)
-                    mfa_settings.SEND_MFA_TEXT_FUNC(_backup_phone.phone_number, mfa_code=code)
+                    _backup_phone.generate_challenge()
                     attrs["mfa_required"] = True
                     attrs["mfa_type"] = mfa.challenge_type
                 else:    
-                    if not verify_mfa_code(_backup_phone.bin_key, mfa_code):
+                    if not _backup_phone.verify_challenge_code(mfa_code):
                         raise serializers.ValidationError(
                             force_text(strings.INVALID_MFA_CODE_ERROR))
             else:
-                challenge = MultiFactorChallenge(mfa, mfa.challenge_type)
-                challenge.generate_challenge()
+                mfa.generate_challenge(mfa.challenge_type)
                 attrs["mfa_required"] = True
                 attrs["mfa_type"] = mfa.challenge_type
 
@@ -102,7 +99,7 @@ class MFAAuthTokenSerializer(AuthTokenSerializer):
                 for backup_phone in backup_phones:
                     attrs["backup_phones"].append({
                         'id': str(backup_phone.pk),
-                        'phone_number': backup_phone.phone_number
-                    })           
+                        'phone_number': backup_phone.get_phone_number()
+                    })
 
         return attrs
