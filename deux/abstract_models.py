@@ -12,7 +12,6 @@ from phonenumber_field.modelfields import PhoneNumberField
 
 from deux.app_settings import mfa_settings
 from deux.constants import CHALLENGE_TYPES, DISABLED, SMS, QRCODE
-from deux.validators import phone_number_validator
 from deux.services import generate_key, generate_mfa_code, verify_mfa_code
 from deux.gateways import send_sms, make_call
 

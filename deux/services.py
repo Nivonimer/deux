@@ -15,7 +15,7 @@ class TotpAuth(object):
         if secret is None:
             secret = pyotp.random_base32()
         self.secret = secret
-        self.totp = pyotp.TOTP(secret)
+        self.totp = pyotp.TOTP(secret, digits=mfa_settings.MFA_CODE_NUM_DIGITS)
 
     def generate_token(self):
         return self.totp.now()

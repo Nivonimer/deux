@@ -80,3 +80,4 @@ class BaseUserTestCase(APITestCase):
         response = self.client.options(url, data=data, format=format)
         self.assertEqual(response.status_code, expected_status_code)
         return response
+

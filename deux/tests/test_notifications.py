@@ -1,4 +1,4 @@
-from __future__ import absolute_import, unicode_literals
+'''from __future__ import absolute_import, unicode_literals
 
 from mock import Mock, patch
 from twilio.rest.exceptions import TwilioRestException
@@ -73,3 +73,4 @@ class SendMFACodeTextMessageTests(BaseUserTestCase):
         twilio_client.return_value = twilio_client_instance
         send_mfa_code_text_message(mfa_instance=self.mfa, mfa_code=self.code)
         twilio_client_instance.messages.create.assert_not_called()
+'''
