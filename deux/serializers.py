@@ -3,6 +3,7 @@ from __future__ import absolute_import, unicode_literals
 import six
 
 from rest_framework import serializers
+from rest_framework.fields import empty
 
 from deux.app_settings import mfa_settings
 from deux import strings
@@ -312,7 +313,7 @@ class BackupPhoneSerializer(serializers.ModelSerializer):
     class Meta:
         model = BackupPhoneAuth
 
-    def validate(self, internal_data):
+    def run_validation(self, data=empty):
         user = self.context['request'].user
         mfa = getattr(user, "multi_factor_auth", None)
 
@@ -321,14 +322,14 @@ class BackupPhoneSerializer(serializers.ModelSerializer):
                 "detail": strings.DISABLED_ERROR
             })
 
-        return super(BackupPhoneSerializer, self).validate(internal_data)
+        return super(BackupPhoneSerializer, self).run_validation(data)
 
 
 class BackupPhoneCreateSerializer(BackupPhoneSerializer):
     """
     class::BackupPhoneCreateSerializer()
 
-    Serializer that facilitates a request to enable MFA over QR CODE.
+    Serializer that facilitates a request to enable Backup Phone.
     """
 
     class Meta(BackupPhoneSerializer.Meta):
@@ -380,7 +381,7 @@ class BackupPhoneRequestSerializer(BackupPhoneSerializer):
     """
     class::BackupPhoneRequestSerializer()
 
-    Serializer that facilitates a request to enable MFA over QR CODE.
+    Serializer that facilitates a request to enable Backup Phone.
     """
 
     class Meta(BackupPhoneSerializer.Meta):
@@ -422,7 +423,7 @@ class BackupPhoneVerifySerializer(BackupPhoneSerializer):
     def validate(self, internal_data):
         if self.instance.confirmed:
             raise serializers.ValidationError({
-                "detail": "Backup Phone is already enabled."
+                "detail": "Backup Phone is already confirmed."
             })
 
         mfa_code = internal_data.get("mfa_code")
