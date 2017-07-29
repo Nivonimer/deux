@@ -10,7 +10,7 @@ from deux.oauth2.exceptions import (
     ChallengeRequiredMessage,
     InvalidLoginError,
 )
-from deux.services import MultiFactorChallenge, verify_mfa_code
+from deux.services import verify_mfa_code
 
 
 class MFAOAuth2Validator(OAuth2Validator):
@@ -73,8 +73,7 @@ class MFAOAuth2Validator(OAuth2Validator):
                     raise InvalidLoginError(force_text(
                         strings.INVALID_BACKUP_CODE_ERROR))
             else:
-                challenge = MultiFactorChallenge(mfa, mfa.challenge_type)
-                challenge.generate_challenge()
+                mfa.generate_challenge(mfa.challenge_type)
                 raise ChallengeRequiredMessage(mfa.challenge_type)
         request.user = user
         return True

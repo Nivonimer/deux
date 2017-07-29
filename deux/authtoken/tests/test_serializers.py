@@ -8,6 +8,7 @@ from deux.constants import DISABLED, SMS
 from deux.authtoken.serializers import MFAAuthTokenSerializer
 from deux.services import generate_mfa_code
 from deux.tests.test_base import BaseUserTestCase
+from deux.models import BackupPhoneAuth
 
 
 class MFAAuthTokenSerializerTest(BaseUserTestCase):
@@ -63,13 +64,9 @@ class MFAAuthTokenSerializerTest(BaseUserTestCase):
         serializer = MFAAuthTokenSerializer(data={
             "username": self.user2.username,
             "password": self.password2,
-            "mfa_code": str(mfa_code)
+            "mfa_code": mfa_code
         })
-        is_valid = serializer.is_valid()
-        print(mfa_code)
-        print(serializer.errors)
-        print(is_valid)
-        self.assertTrue(is_valid)
+        self.assertTrue(serializer.is_valid())
 
         bad_code = six.text_type(int(mfa_code) + 1)
         serializer = MFAAuthTokenSerializer(data={
@@ -101,10 +98,9 @@ class MFAAuthTokenSerializerTest(BaseUserTestCase):
         self.assertEqual(instance.challenge_type, DISABLED)
         self.assertEqual(instance.backup_code, "")
 
-    #@patch("deux.authtoken.serializers.MultiFactorChallenge")
     def test_login_and_continue_with_challenge(self):
         self.mfa.enable(SMS)
-        self.mfa.phone_number = "1234567890"
+        self.mfa.phone_number = "+351962457123"
         self.mfa.save()
         serializer = MFAAuthTokenSerializer(data={
             "username": self.user2.username,
@@ -122,8 +118,9 @@ class MFAAuthTokenSerializerTest(BaseUserTestCase):
         self.assertTrue(data["mfa_required"])
         self.assertEqual(data["mfa_type"], SMS)
 
-        #challenge.assert_called_once_with(self.mfa, SMS)
-        #challenge.return_value.generate_challenge.assert_called_once_with()
+        self.mfa.generate_challenge(SMS)
+        mfa_code = generate_mfa_code(self.mfa.get_bin_key(SMS))
+        self.assertTrue(self.mfa.verify_challenge_code(mfa_code))
 
     def test_login_with_other_users_code(self):
         mfa_1 = mfa_settings.MFA_MODEL.objects.create(user=self.user1)
@@ -149,3 +146,19 @@ class MFAAuthTokenSerializerTest(BaseUserTestCase):
             "backup_code": mfa_2_backup
         })
         self.assertFalse(serializer.is_valid())
+    
+    def test_login_with_backup_phone_number(self):
+        self.mfa.enable(SMS)
+        self.mfa.phone_number = "+351962457123"
+        self.mfa.save()
+
+        # User 2 try login with backup phone number
+        backup_phone = BackupPhoneAuth.objects.create(user=self.user2, phone_number="+351962457123", confirmed=True)
+        mfa_code = generate_mfa_code(bin_key=backup_phone.bin_key)
+        serializer = MFAAuthTokenSerializer(data={
+            "username": self.user2.username,
+            "password": self.password2,
+            "backup_phone": str(backup_phone.pk),
+            "mfa_code": mfa_code
+        })
+        self.assertTrue(serializer.is_valid())

@@ -26,7 +26,6 @@ class _BaseMFAViewTest(BaseUserTestCase):
 class ObtainMFAAuthTokenTest(_BaseMFAViewTest):
     url = reverse("authtoken:login")
 
-    #@patch("deux.authtoken.serializers.MultiFactorChallenge")
     def test_login_mfa_required(self):
         # Correct credentials without MFA code.
         data = {

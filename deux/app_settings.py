@@ -20,7 +20,8 @@ DEFAULTS = {
     "TWO_FACTOR_SMS_GATEWAY": "deux.gateways.fake.Fake",
     "TWO_FACTOR_CALL_GATEWAY": "deux.gateways.fake.Fake",
     "MASKED_PHONE_NUMBER": True,
-    "MAX_BACKUP_PHONE_NUMBERS": 3
+    "MAX_BACKUP_PHONE_NUMBERS": 3,
+    "QRCODE_GENERATER_URL": "qrcode_generate-detail"
 }
 
 # List of settings that cannot be empty.

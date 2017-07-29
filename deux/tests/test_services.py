@@ -10,7 +10,6 @@ from django_otp.util import random_hex
 from deux.app_settings import mfa_settings
 from deux.constants import SMS
 from deux.services import (
-    MultiFactorChallenge,
     generate_mfa_code,
     verify_mfa_code,
 )

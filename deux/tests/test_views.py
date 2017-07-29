@@ -6,7 +6,7 @@ from django.core.urlresolvers import reverse
 from rest_framework import status
 
 from deux.app_settings import mfa_settings
-from deux.constants import DISABLED, SMS
+from deux.constants import DISABLED, SMS, QRCODE
 from deux.exceptions import FailedChallengeError
 from deux.services import generate_mfa_code
 from deux import strings
@@ -103,7 +103,6 @@ class SMSChallengeRequestViewTest(_BaseMFAViewTest):
         })
 
     '''
-    @patch("deux.serializers.MultiFactorChallenge")
     def test_failed_sms_error(self, challenge):
         challenge.return_value.generate_challenge.side_effect = (
             FailedChallengeError("Error Message."))
@@ -159,7 +158,7 @@ class SMSChallengeVerifyViewTest(_BaseMFAViewTest):
         mfa_code = generate_mfa_code(self.mfa_1.get_bin_key(SMS))
         resp = self.check_put_response(
             self.url, status.HTTP_200_OK, user=self.user1,
-            data={"mfa_code": str(mfa_code)}
+            data={"mfa_code": mfa_code}
         )
         resp_json = resp.data
         self.assertEqual(resp_json["enabled"], True)
@@ -167,6 +166,51 @@ class SMSChallengeVerifyViewTest(_BaseMFAViewTest):
         instance = mfa_settings.MFA_MODEL.objects.get(user=self.user1)
         self.assertTrue(instance.enabled)
         self.assertEqual(instance.challenge_type, SMS)
+
+
+class QRCODEChallengeRequestViewTest(_BaseMFAViewTest):
+    url = reverse("qrcode_request-detail")
+
+    def test_unauthorized(self):
+        self.check_put_response(self.url, status.HTTP_403_FORBIDDEN)
+
+    def test_already_enabled(self):
+        resp = self.check_put_response(
+            self.url, status.HTTP_400_BAD_REQUEST, user=self.user2,
+            data={"mfa_code": "code"})
+        self.assertEqual(resp.data, {"detail": [strings.ENABLED_ERROR]})
+    
+    def test_success(self):
+        resp = self.check_put_response(
+            self.url, status.HTTP_200_OK, user=self.user1)
+        self.assertIn('qrcode_url', resp.data)
+        self.mfa_1.generate_challenge(QRCODE)
+
+
+class QRCODEChallengeVerifyViewTest(_BaseMFAViewTest):
+    url = reverse("qrcode_verify-detail")
+
+    def test_unauthorized(self):
+        self.check_put_response(self.url, status.HTTP_403_FORBIDDEN)
+
+    def test_already_enabled(self):
+        resp = self.check_put_response(
+            self.url, status.HTTP_400_BAD_REQUEST, user=self.user2,
+            data={"mfa_code": "code"})
+        self.assertEqual(resp.data, {"detail": [strings.ENABLED_ERROR]})
+
+    def test_success(self):
+        mfa_code = generate_mfa_code(self.mfa_1.get_bin_key(QRCODE))
+        resp = self.check_put_response(
+            self.url, status.HTTP_200_OK, user=self.user1,
+            data={"mfa_code": mfa_code}
+        )
+        resp_json = resp.data
+        self.assertEqual(resp_json["enabled"], True)
+        self.assertEqual(resp_json["challenge_type"], QRCODE)
+        instance = mfa_settings.MFA_MODEL.objects.get(user=self.user1)
+        self.assertTrue(instance.enabled)
+        self.assertEqual(instance.challenge_type, QRCODE)
 
 
 class BackupCodesViewTest(_BaseMFAViewTest):
@@ -302,7 +346,7 @@ class BackupPhonesViewTest(_BaseMFAViewTest):
         # Check for HTTP200 - Verified backup phone
         resp = self.check_put_response(
             self.url_verify(backupphone_id), status.HTTP_200_OK, user=self.user2, 
-            data={"mfa_code": str(mfa_code)}
+            data={"mfa_code": mfa_code}
         )
         self.assertEqual(resp.data, {
             "confirmed": True
@@ -331,7 +375,7 @@ class BackupPhonesViewTest(_BaseMFAViewTest):
         # Check for HTTP200 - Verified backup phone
         resp = self.check_put_response(
             self.url_verify(backupphone_id), status.HTTP_200_OK, user=self.user2, 
-            data={"mfa_code": str(mfa_code)}
+            data={"mfa_code": mfa_code}
         )
         self.assertEqual(resp.data, {
             "confirmed": True
