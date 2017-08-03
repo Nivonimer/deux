@@ -15,17 +15,20 @@ class TotpAuth(object):
         if secret is None:
             secret = pyotp.random_base32()
         self.secret = secret
-        self.totp = pyotp.TOTP(secret, digits=mfa_settings.MFA_CODE_NUM_DIGITS)
+        self.totp = pyotp.TOTP(secret, 
+            digits=mfa_settings.MFA_CODE_NUM_DIGITS, 
+            interval=mfa_settings.MFA_CODE_INTERVAL)
 
     def generate_token(self):
         return self.totp.now()
 
     def valid(self, token):
         now = datetime.datetime.now()
-        time30secsago = now + datetime.timedelta(seconds=-30)
+        interval = now + datetime.timedelta(seconds=-mfa_settings.MFA_CODE_INTERVAL)
         try:
             valid_now = self.totp.verify(token)
-            valid_past = self.totp.verify(token, for_time=time30secsago)
+            valid_past = self.totp.verify(token, for_time=interval)
+            
             return valid_now or valid_past
         except Exception:
             return False

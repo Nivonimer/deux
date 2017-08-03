@@ -351,6 +351,7 @@ class BackupPhoneCreateSerializer(BackupPhoneSerializer):
                 "detail": "Phone number already exists."
             })
 
+        # TODO: Validate number for allow resend code for one was confirmed
         if user_phones.count() >= mfa_settings.MAX_BACKUP_PHONE_NUMBERS:
             raise serializers.ValidationError({
                 "detail": "Limit of phone numbers is {}".format(
