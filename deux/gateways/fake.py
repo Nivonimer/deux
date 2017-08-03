@@ -2,6 +2,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+from deux import strings
+
 
 class Fake(object):
     """
@@ -31,4 +33,5 @@ class Fake(object):
 
     @staticmethod
     def send_sms(phone_number, token):
-        logger.info('Fake SMS to %s: "Your token is: %s"', phone_number, token)
+        message = strings.MFA_CODE_TEXT_MESSAGE.format(code=token)
+        logger.info('Fake SMS to %s: "%s"', phone_number, message)

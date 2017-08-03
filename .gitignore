@@ -30,4 +30,4 @@ cover/
 coverage.*
 htmlcov/
 .vagrant/
-py3env
+venv

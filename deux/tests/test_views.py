@@ -102,6 +102,48 @@ class SMSChallengeRequestViewTest(_BaseMFAViewTest):
             "phone_number": ["The phone number entered is not valid."]
         })
 
+    def test_pt_phone_numbers(self):
+        # valid phone number.
+        resp = self.check_put_response(
+            self.url, status.HTTP_200_OK, user=self.user1,
+            data={"phone_number": "+351962135612"})
+
+        # invalid phone number.
+        resp = self.check_put_response(
+            self.url, status.HTTP_400_BAD_REQUEST, user=self.user1,
+            data={"phone_number": "+351982135612"})
+        self.assertEqual(resp.data, {
+            "phone_number": ["The phone number entered is not valid."]
+        })
+
+    def test_es_phone_numbers(self):
+        # valid phone number.
+        resp = self.check_put_response(
+            self.url, status.HTTP_200_OK, user=self.user1,
+            data={"phone_number": "+34749159049"})
+
+        # invalid phone number.
+        resp = self.check_put_response(
+            self.url, status.HTTP_400_BAD_REQUEST, user=self.user1,
+            data={"phone_number": "+34000123456"})
+        self.assertEqual(resp.data, {
+            "phone_number": ["The phone number entered is not valid."]
+        })
+
+    def test_fr_phone_numbers(self):
+        # valid phone number.
+        resp = self.check_put_response(
+            self.url, status.HTTP_200_OK, user=self.user1,
+            data={"phone_number": "+330623124554"})
+
+        # invalid phone number.
+        resp = self.check_put_response(
+            self.url, status.HTTP_400_BAD_REQUEST, user=self.user1,
+            data={"phone_number": "+331623124554"})
+        self.assertEqual(resp.data, {
+            "phone_number": ["The phone number entered is not valid."]
+        })
+
     '''
     def test_failed_sms_error(self, challenge):
         challenge.return_value.generate_challenge.side_effect = (
