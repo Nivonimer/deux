@@ -26,3 +26,13 @@ class TwilioMessageError(FailedChallengeError):
 
     def __init__(self, message=strings.SMS_SEND_ERROR):
         super(TwilioMessageError, self).__init__(message)
+
+
+class BulkSMSMessageError(FailedChallengeError):
+    """
+    Exception that BulkSMS failed to send the text message for reasons
+    other than ``NotSMSNumberError``.
+    """
+
+    def __init__(self, message=strings.SMS_SEND_ERROR):
+        super(BulkSMSMessageError, self).__init__(message)

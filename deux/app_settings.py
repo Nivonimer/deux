@@ -11,12 +11,24 @@ USER_SETTINGS = getattr(settings, 'DEUX', None)
 DEFAULTS = {
     "BACKUP_CODE_DIGITS": 12,
     "MFA_CODE_NUM_DIGITS": 6,
+    "MFA_CODE_INTERVAL": 30,
     "MFA_MODEL": "deux.models.MultiFactorAuth",
-    "SEND_MFA_TEXT_FUNC": "deux.notifications.send_mfa_code_text_message",
     "STEP_SIZE": 30,
+    "APP_NAME": "Application Name",
+    "TWO_FACTOR_SMS_GATEWAY": "deux.gateways.fake.Fake",
+    "TWO_FACTOR_CALL_GATEWAY": "deux.gateways.fake.Fake",
+    "MASKED_PHONE_NUMBER": True,
+    "MAX_BACKUP_PHONE_NUMBERS": 3,
+    "QRCODE_GENERATER_URL": "qrcode_generate-detail",
+    
+    # TWILIO
     "TWILIO_ACCOUNT_SID": "",
     "TWILIO_AUTH_TOKEN": "",
-    "TWILIO_SMS_POOL_SID": "",
+    "TWILIO_CALLER_ID": "",
+
+    # BULKSMS
+    "BULKSMS_USERNAME": "",
+    "BULKSMS_PASSWORD": "",
 }
 
 # List of settings that cannot be empty.
@@ -25,7 +37,6 @@ MANDATORY = ()
 # List of settings that may be in string import notation.
 IMPORT_STRINGS = (
     'MFA_MODEL',
-    'SEND_MFA_TEXT_FUNC',
 )
 
 

@@ -4,14 +4,14 @@ from deux.app_settings import mfa_settings
 from deux.constants import DISABLED, SMS
 
 from .test_base import BaseUserTestCase
-
+from deux.models import BackupPhoneAuth
 
 class MultiFactorAuthTests(BaseUserTestCase):
 
     def setUp(self):
         self.simpleUserSetup()
         self.mfa = mfa_settings.MFA_MODEL.objects.create(
-            user=self.user1, phone_number="12345678900")
+            user=self.user1, phone_number="+351962457123")
 
     def test_default_disabled(self):
         self.assertEqual(self.mfa.challenge_type, DISABLED)
@@ -34,7 +34,7 @@ class MultiFactorAuthTests(BaseUserTestCase):
         self.assertFalse(self.mfa.enabled)
 
     def test_phone_number(self):
-        self.assertEqual(self.mfa.phone_number, "12345678900")
+        self.assertEqual(self.mfa.phone_number.as_e164, "+351962457123")
 
     def test_backup_code_generation(self):
         # AssertionError if disabled.
@@ -68,3 +68,18 @@ class MultiFactorAuthTests(BaseUserTestCase):
         instance = mfa_settings.MFA_MODEL.objects.get(user=self.user1)
         self.assertFalse(instance.enabled)
         self.assertEqual(instance.challenge_type, DISABLED)
+
+
+class BackupPhoneTestCase(BaseUserTestCase):
+
+    def setUp(self):
+        self.simpleUserSetup()
+        self.backup_phone = BackupPhoneAuth.objects.create(user=self.user1, phone_number="+351962457123")
+
+    def test_default_confirmed(self):
+        self.assertFalse(self.backup_phone.confirmed)
+    
+    def test_phone_number(self):
+        self.assertEqual(self.backup_phone.phone_number.as_e164, "+351962457123")
+
+    #def test_
