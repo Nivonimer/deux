@@ -4,6 +4,7 @@ import pyotp
 import datetime
 from uuid import uuid4
 import qrcode
+import urllib
 
 from deux.app_settings import mfa_settings
 from deux.constants import CHALLENGE_TYPES, SMS, QRCODE
@@ -28,7 +29,7 @@ class TotpAuth(object):
         try:
             valid_now = self.totp.verify(token)
             valid_past = self.totp.verify(token, for_time=interval)
-            
+
             return valid_now or valid_past
         except Exception:
             return False
@@ -42,7 +43,8 @@ class TotpAuth(object):
 
 
 def generate_qrcode_url(bin_key, username, issuer_name):
-    return TotpAuth(bin_key).qrcode_uri(username, issuer_name)
+    url = TotpAuth(bin_key).qrcode_uri(username, issuer_name)
+    return urllib.quote(url)
 
 
 def generate_mfa_code(bin_key):

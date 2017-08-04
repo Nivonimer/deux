@@ -169,6 +169,7 @@ class QRCODEGeneratorView(View):
 
         otpauth_url = request.GET['url']
         # Make and return QR code
+
         img = qrcode.make(otpauth_url, image_factory=image_factory)
         resp = HttpResponse(content_type=content_type)
         img.save(resp)
