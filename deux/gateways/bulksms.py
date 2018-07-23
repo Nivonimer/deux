@@ -1,5 +1,6 @@
 import logging
-from urllib import urlencode, urlopen
+from urllib.parse import urlencode
+from urllib.request import urlopen
 from deux.app_settings import mfa_settings
 
 from django.utils.translation import ugettext

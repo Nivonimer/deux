@@ -17,12 +17,12 @@ from django.conf.urls import include, url
 
 urlpatterns = [
     url(r"^api-auth/",
-        include("rest_framework.urls", namespace="rest_framework")),
-    url(r"^mfa/", include("deux.urls")),
+        include(("rest_framework.urls", "rest_framework"), namespace="rest_framework")),
+    url(r"^mfa/", include(("deux.urls", "deux"), namespace="deux")),
     url(r"^mfa/authtoken/",
-        include("deux.authtoken.urls", namespace="authtoken"),
+        include(("deux.authtoken.urls", "authtoken"), namespace="authtoken"),
     ),
     url(r"^mfa/oauth2/",
-        include("deux.oauth2.urls", namespace="oauth2"),
+        include(("deux.oauth2.urls", "oauth2"), namespace="oauth2"),
     ),
 ]

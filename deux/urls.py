@@ -5,6 +5,7 @@ from rest_framework.urlpatterns import format_suffix_patterns
 
 from deux import views
 
+
 urlpatterns = [
     url(r"^$", views.MultiFactorAuthDetail.as_view(),
         name="multi_factor_auth-detail"),
@@ -26,13 +27,13 @@ urlpatterns = [
     # BACKUP PHONE NUMBERS
     url(r"^backupphone/$", views.BackupPhoneCreate.as_view(),
         name="backupphone-create"),
-    url(r"^backupphone/(?P<backupphone_id>[0-9a-z-]+)/verify/$", 
+    url(r"^backupphone/(?P<backupphone_id>[0-9a-z-]+)/verify/$",
         views.BackupPhoneVerifyDetail.as_view(),
         name="backupphone_verify-detail"),
-    url(r"^backupphone/(?P<backupphone_id>[0-9a-z-]+)/request/$", 
+    url(r"^backupphone/(?P<backupphone_id>[0-9a-z-]+)/request/$",
         views.BackupPhoneRequestDetail.as_view(),
         name="backupphone_request-detail"),
-    url(r"^backupphone/(?P<backupphone_id>[0-9a-z-]+)/$", 
+    url(r"^backupphone/(?P<backupphone_id>[0-9a-z-]+)/$",
         views.BackupPhoneDelete.as_view(),
         name="backupphone-delete"),
 

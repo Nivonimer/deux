@@ -2,7 +2,7 @@ from __future__ import absolute_import, unicode_literals
 
 from mock import patch
 
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from rest_framework import status
 
 from deux.app_settings import mfa_settings
@@ -29,7 +29,7 @@ class _BaseMFAViewTest(BaseUserTestCase):
 
 
 class MultiFactorAuthViewTest(_BaseMFAViewTest):
-    url = reverse("multi_factor_auth-detail")
+    url = reverse("deux:multi_factor_auth-detail")
 
     def test_get(self):
         # Check for HTTP401.
@@ -75,7 +75,7 @@ class MultiFactorAuthViewTest(_BaseMFAViewTest):
 
 
 class SMSChallengeRequestViewTest(_BaseMFAViewTest):
-    url = reverse("sms_request-detail")
+    url = reverse("deux:sms_request-detail")
 
     def test_unauthorized(self):
         self.check_put_response(self.url, status.HTTP_403_FORBIDDEN)
@@ -166,7 +166,7 @@ class SMSChallengeRequestViewTest(_BaseMFAViewTest):
 
 
 class SMSChallengeVerifyViewTest(_BaseMFAViewTest):
-    url = reverse("sms_verify-detail")
+    url = reverse("deux:sms_verify-detail")
 
     def test_unauthorized(self):
         self.check_put_response(self.url, status.HTTP_403_FORBIDDEN)
@@ -211,7 +211,7 @@ class SMSChallengeVerifyViewTest(_BaseMFAViewTest):
 
 
 class QRCODEChallengeRequestViewTest(_BaseMFAViewTest):
-    url = reverse("qrcode_request-detail")
+    url = reverse("deux:qrcode_request-detail")
 
     def test_unauthorized(self):
         self.check_put_response(self.url, status.HTTP_403_FORBIDDEN)
@@ -221,7 +221,7 @@ class QRCODEChallengeRequestViewTest(_BaseMFAViewTest):
             self.url, status.HTTP_400_BAD_REQUEST, user=self.user2,
             data={"mfa_code": "code"})
         self.assertEqual(resp.data, {"detail": [strings.ENABLED_ERROR]})
-    
+
     def test_success(self):
         resp = self.check_put_response(
             self.url, status.HTTP_200_OK, user=self.user1)
@@ -230,7 +230,7 @@ class QRCODEChallengeRequestViewTest(_BaseMFAViewTest):
 
 
 class QRCODEChallengeVerifyViewTest(_BaseMFAViewTest):
-    url = reverse("qrcode_verify-detail")
+    url = reverse("deux:qrcode_verify-detail")
 
     def test_unauthorized(self):
         self.check_put_response(self.url, status.HTTP_403_FORBIDDEN)
@@ -256,7 +256,7 @@ class QRCODEChallengeVerifyViewTest(_BaseMFAViewTest):
 
 
 class BackupCodesViewTest(_BaseMFAViewTest):
-    url = reverse("backup_code-detail")
+    url = reverse("deux:backup_code-detail")
 
     def test_get(self):
         # Check for HTTP403.
@@ -277,18 +277,18 @@ class BackupCodesViewTest(_BaseMFAViewTest):
 
 
 class BackupPhonesViewTest(_BaseMFAViewTest):
-    url_create = reverse("backupphone-create")
-    mfa_url = reverse("multi_factor_auth-detail")
+    url_create = reverse("deux:backupphone-create")
+    mfa_url = reverse("deux:multi_factor_auth-detail")
 
     def url_request(self, backupphone_id):
-        return reverse("backupphone_request-detail", kwargs={"backupphone_id": backupphone_id})
-    
+        return reverse("deux:backupphone_request-detail", kwargs={"backupphone_id": backupphone_id})
+
     def url_verify(self, backupphone_id):
-        return reverse("backupphone_verify-detail", kwargs={"backupphone_id": backupphone_id})
-    
+        return reverse("deux:backupphone_verify-detail", kwargs={"backupphone_id": backupphone_id})
+
     def url_delete(self, backupphone_id):
-        return reverse("backupphone-delete", kwargs={"backupphone_id": backupphone_id})
-    
+        return reverse("deux:backupphone-delete", kwargs={"backupphone_id": backupphone_id})
+
     def test_create_backup_phone_with_mfa_disable(self):
         # Check for HTTP403.
         self.check_post_response(self.url_create, status.HTTP_403_FORBIDDEN)
@@ -313,39 +313,39 @@ class BackupPhonesViewTest(_BaseMFAViewTest):
 
         # Check for HTTP201 - Create Phone Number
         resp = self.check_post_response(
-            self.url_create, status.HTTP_201_CREATED, user=self.user2, 
+            self.url_create, status.HTTP_201_CREATED, user=self.user2,
             data={"phone_number": "+351962457123"}
         )
         self.assertIn('method', resp.data)
         self.assertIn('id', resp.data)
         self.assertIn('phone_number', resp.data)
-    
+
     def test_create_duplicated_backup_phone(self):
         # Check for HTTP201 - Create Phone Number
         resp = self.check_post_response(
-            self.url_create, status.HTTP_201_CREATED, user=self.user2, 
+            self.url_create, status.HTTP_201_CREATED, user=self.user2,
             data={"phone_number": "+351962457123"}
         )
 
         # Check for HTTP400 - Try Create Duplicated Phone Number
         resp = self.check_post_response(
-            self.url_create, status.HTTP_400_BAD_REQUEST, user=self.user2, 
+            self.url_create, status.HTTP_400_BAD_REQUEST, user=self.user2,
             data={"phone_number": "+351962457123"}
         )
         self.assertEqual(resp.data, {
             "detail": ["Phone number already exists."]
         })
-    
+
     def test_exceed_max_backup_phones(self):
         for i in range(0, mfa_settings.MAX_BACKUP_PHONE_NUMBERS):
             resp = self.check_post_response(
-                self.url_create, status.HTTP_201_CREATED, user=self.user2, 
+                self.url_create, status.HTTP_201_CREATED, user=self.user2,
                 data={"phone_number": "+35196245712" + str(i)}
             )
-        
+
         # Check for HTTP400 - Try Exceed Max Backup Phone Numbers
         resp = self.check_post_response(
-            self.url_create, status.HTTP_400_BAD_REQUEST, user=self.user2, 
+            self.url_create, status.HTTP_400_BAD_REQUEST, user=self.user2,
             data={"phone_number": "+351962457124"}
         )
         self.assertEqual(resp.data, {
@@ -355,7 +355,7 @@ class BackupPhonesViewTest(_BaseMFAViewTest):
     def test_request_backup_phone(self):
         # Check for HTTP201 - Create Phone Number
         resp = self.check_post_response(
-            self.url_create, status.HTTP_201_CREATED, user=self.user2, 
+            self.url_create, status.HTTP_201_CREATED, user=self.user2,
             data={"phone_number": "+351962457123"}
         )
         backupphone_id = resp.data['id']
@@ -374,7 +374,7 @@ class BackupPhonesViewTest(_BaseMFAViewTest):
     def test_verify_backup_phone(self):
         # Check for HTTP201 - Create Phone Number
         resp = self.check_post_response(
-            self.url_create, status.HTTP_201_CREATED, user=self.user2, 
+            self.url_create, status.HTTP_201_CREATED, user=self.user2,
             data={"phone_number": "+351962457123"}
         )
         backupphone_id = resp.data['id']
@@ -387,7 +387,7 @@ class BackupPhonesViewTest(_BaseMFAViewTest):
 
         # Check for HTTP200 - Verified backup phone
         resp = self.check_put_response(
-            self.url_verify(backupphone_id), status.HTTP_200_OK, user=self.user2, 
+            self.url_verify(backupphone_id), status.HTTP_200_OK, user=self.user2,
             data={"mfa_code": mfa_code}
         )
         self.assertEqual(resp.data, {
@@ -406,7 +406,7 @@ class BackupPhonesViewTest(_BaseMFAViewTest):
     def test_verify_confirmed_backup_phone(self):
         # Check for HTTP201 - Create Phone Number
         resp = self.check_post_response(
-            self.url_create, status.HTTP_201_CREATED, user=self.user2, 
+            self.url_create, status.HTTP_201_CREATED, user=self.user2,
             data={"phone_number": "+351962457123"}
         )
         backupphone_id = resp.data['id']
@@ -416,7 +416,7 @@ class BackupPhonesViewTest(_BaseMFAViewTest):
 
         # Check for HTTP200 - Verified backup phone
         resp = self.check_put_response(
-            self.url_verify(backupphone_id), status.HTTP_200_OK, user=self.user2, 
+            self.url_verify(backupphone_id), status.HTTP_200_OK, user=self.user2,
             data={"mfa_code": mfa_code}
         )
         self.assertEqual(resp.data, {
@@ -425,7 +425,7 @@ class BackupPhonesViewTest(_BaseMFAViewTest):
 
         # Check for HTTP400 - Try Verify again backup phone
         resp = self.check_put_response(
-            self.url_verify(backupphone_id), status.HTTP_400_BAD_REQUEST, user=self.user2, 
+            self.url_verify(backupphone_id), status.HTTP_400_BAD_REQUEST, user=self.user2,
             data={"mfa_code": mfa_code}
         )
         self.assertEqual(resp.data, {
@@ -435,7 +435,7 @@ class BackupPhonesViewTest(_BaseMFAViewTest):
     def test_delete_backup_phone(self):
         # Check for HTTP201 - Create Phone Number
         resp = self.check_post_response(
-            self.url_create, status.HTTP_201_CREATED, user=self.user2, 
+            self.url_create, status.HTTP_201_CREATED, user=self.user2,
             data={"phone_number": "+351962457123"}
         )
         backupphone_id = resp.data['id']

@@ -239,9 +239,9 @@ class QRCODEChallengeRequestSerializer(_BaseChallengeRequestSerializer):
 
     def update(self, mfa_instance, validated_data):
         super(QRCODEChallengeRequestSerializer, self).update(mfa_instance, validated_data)
-        
+
         return mfa_instance
-    
+
     def to_representation(self, mfa_instance):
         data = super(QRCODEChallengeRequestSerializer, self).to_representation(mfa_instance)
 
@@ -252,7 +252,7 @@ class QRCODEChallengeRequestSerializer(_BaseChallengeRequestSerializer):
         )
         request = self.context['request']
         data['qrcode_url'] = request.build_absolute_uri(
-            reverse(mfa_settings.QRCODE_GENERATER_URL)) + '?url=' + otpauth_url
+            reverse("deux:" + mfa_settings.QRCODE_GENERATER_URL)) + '?url=' + otpauth_url
 
         return data
 
@@ -339,7 +339,7 @@ class BackupPhoneCreateSerializer(BackupPhoneSerializer):
                 "required": True,
             },
         }
-    
+
     def validate(self, internal_data):
         user_phones = BackupPhoneAuth.objects.backup_phones_for_user(
             user=self.context['request'].user
@@ -359,7 +359,7 @@ class BackupPhoneCreateSerializer(BackupPhoneSerializer):
             })
 
         return super(BackupPhoneCreateSerializer, self).validate(internal_data)
-    
+
     def create(self, validated_data):
         """Executes the SMS challenge."""
         instance = BackupPhoneAuth.objects.create(
