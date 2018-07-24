@@ -245,9 +245,14 @@ class QRCODEChallengeRequestSerializer(_BaseChallengeRequestSerializer):
     def to_representation(self, mfa_instance):
         data = super(QRCODEChallengeRequestSerializer, self).to_representation(mfa_instance)
 
+        name = self.instance.user.username
+
+        if not name:
+            name = self.instance.user.email
+
         otpauth_url = generate_qrcode_url(
             self.instance.get_bin_key(self.challenge_type),
-            self.instance.user.username,
+            name,
             mfa_settings.APP_NAME
         )
         request = self.context['request']
