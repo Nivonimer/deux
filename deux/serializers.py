@@ -259,10 +259,11 @@ class QRCODEChallengeRequestSerializer(_BaseChallengeRequestSerializer):
         )
         request = self.context['request']
 
-        url = request.build_absolute_uri(
+        otpauth_url = quote(otpauth_url)
+
+        data['qrcode_url'] = request.build_absolute_uri(
             reverse("deux:" + mfa_settings.QRCODE_GENERATER_URL)) + '?url=' + otpauth_url
 
-        data['qrcode_url'] = quote(url)
 
         return data
 
