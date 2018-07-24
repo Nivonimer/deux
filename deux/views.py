@@ -28,6 +28,8 @@ from deux.serializers import (
     BackupPhoneVerifySerializer
 )
 
+from urllib.parse import unquote
+
 
 class MultiFactorAuthMixin(object):
     """
@@ -167,7 +169,8 @@ class QRCODEGeneratorView(View):
         if 'url' not in request.GET:
             raise Http404()
 
-        otpauth_url = request.GET['url']
+        otpauth_url = unquote(request.GET['url'])
+
         # Make and return QR code
         img = qrcode.make(otpauth_url, image_factory=image_factory)
         resp = HttpResponse(content_type=content_type)
@@ -185,7 +188,7 @@ class BackupPhoneChallengeMixin(object):
 
     def get_object(self):
         """Gets the current user's MFA instance"""
-        
+
         backupphone_id = self.kwargs['backupphone_id']
         results = BackupPhoneAuth.objects.backup_phones_for_user(
             user=self.request.user
@@ -227,7 +230,7 @@ class BackupPhoneVerifyDetail(BackupPhoneChallengeMixin, generics.UpdateAPIView)
 
 class BackupPhoneDelete(BackupPhoneChallengeMixin, generics.DestroyAPIView):
     """
-    class::BackupPhoneDelete()  
+    class::BackupPhoneDelete()
 
     View for retrieving the user's backup code.
     """

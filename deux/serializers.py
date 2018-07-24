@@ -17,6 +17,8 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse  # < django 1.10
 
+from urllib.parse import quote
+
 
 class MultiFactorAuthSerializer(serializers.ModelSerializer):
     """
@@ -256,8 +258,11 @@ class QRCODEChallengeRequestSerializer(_BaseChallengeRequestSerializer):
             mfa_settings.APP_NAME
         )
         request = self.context['request']
-        data['qrcode_url'] = request.build_absolute_uri(
+
+        url = request.build_absolute_uri(
             reverse("deux:" + mfa_settings.QRCODE_GENERATER_URL)) + '?url=' + otpauth_url
+
+        data['qrcode_url'] = quote(url)
 
         return data
 
